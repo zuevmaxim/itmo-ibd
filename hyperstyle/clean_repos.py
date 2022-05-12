@@ -7,9 +7,13 @@ set_of_supported_extension = {".kt", ".kts", ".js", ".py", ".java"}
 def clean_repos(repos_dir):
     for root, _, files in os.walk(repos_dir):
         for file in files:
-            file_extension = os.path.splitext(file)[1]
-            if file_extension not in set_of_supported_extension:
+            splitted_file = os.path.splitext(file)
+            if len(splitted_file) < 2:
                 os.remove(os.path.join(root, file))
+            else:
+                file_extension = os.path.splitext(file)[1]
+                if file_extension not in set_of_supported_extension:
+                    os.remove(os.path.join(root, file))
 
 
 if __name__ == '__main__':
