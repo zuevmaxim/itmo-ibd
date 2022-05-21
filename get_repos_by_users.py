@@ -1,5 +1,4 @@
 import sys
-import pandas as pd
 
 import requests
 
@@ -23,23 +22,21 @@ def get_repos(username, headers):
     return repos
 
 
-def get_repos_by_users(users, token=None):
+def get_repos_by_users(users, output_file, token=None):
     """
     Find all repositories that given users are related to.
     :param users: list of users to get repositories
+    :param output_file: CSV file to write the result
     :param token: optional GitHub personal access token to enlarge requests abilities
-    :return: pandas dataframe with repos
     """
     headers = {}
     if token is not None:
         headers['authorization'] = "token %s" % token
-
-    d = {'user': [], 'repo': []}
-    for user in users:
-        repos = get_repos(user, headers)
-        d['user'] += [user] * len(repos)
-        d['repo'] += repos
-    return pd.DataFrame.from_dict(d)
+    with open(output_file, 'w') as f:
+        for user in users:
+            repos = get_repos(user, headers)
+            lines = ["{},{}\n".format(user, repo) for repo in repos]
+            f.writelines(lines)
 
 
 def get_users(file):
@@ -67,6 +64,4 @@ if __name__ == '__main__':
     repos_file = sys.argv[2]
 
     users = get_users(users_file)
-
-    repos = get_repos_by_users(users, token)
-    repos.to_csv(repos_file, index=False)
+    get_repos_by_users(users, repos_file, token)
