@@ -1,3 +1,5 @@
 FROM stepik/hyperstyle:1.2.2
 
-CMD python /review/hyperstyle/src/python/review/run_tool.py /data > /output/result.json
+COPY ./process_all_repos.sh ./process_all_repos.sh
+
+CMD ./process_all_repos.sh
