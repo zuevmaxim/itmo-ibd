@@ -12,7 +12,7 @@ RUN apt-get install libpq-dev -y
 RUN apt-get install postgresql -y
 RUN apt-get install git -y
 
-RUN git clone https://github.com/JetBrains-Research/Lupa.git
+RUN git clone -b quick-fixes https://github.com/tiginamaria/Lupa.git
 
 WORKDIR /Lupa
 RUN pip3 install -r scripts/requirements.txt
@@ -21,4 +21,5 @@ WORKDIR /Lupa/scripts
 ENV PYTHONPATH=$PYTHONPATH:/Lupa/scripts
 
 RUN pip3 install psycopg2
-CMD python3 plugin_runner/batch_processing.py /data /output python-imports
+CMD python3 plugin_runner/batch_processing.py /data /output_python python-imports
+#CMD python3 plugin_runner/batch_processing.py /data /output_java kotlin-dependencies
