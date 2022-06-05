@@ -1,3 +1,4 @@
+# Lupa tool execution
 
 1. Build docker image. \
 To build docker image run following command inside itmo-bd/lupa directory:

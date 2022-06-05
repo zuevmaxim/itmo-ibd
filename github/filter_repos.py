@@ -21,7 +21,7 @@ if __name__ == '__main__':
     Clean repos of unsupported files.
     1 argument expected - path to the folder with repos to be cleaned 
     """
-    if len(sys.argv) != 1:
+    if len(sys.argv) != 2:
         exit(1)
 
     repos_dir = sys.argv[1]
