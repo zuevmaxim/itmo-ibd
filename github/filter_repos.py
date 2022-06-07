@@ -1,7 +1,8 @@
 import os
+import shutil
 import sys
 
-set_of_supported_extension = {".kt", ".kts", ".js", ".py", ".java"}
+set_of_supported_extension = {".kt", ".kts", ".py", ".java"}
 
 
 def clean_repos(repos_dir):
@@ -16,6 +17,31 @@ def clean_repos(repos_dir):
                     os.remove(os.path.join(root, file))
 
 
+def delete_repos(repos_dir):
+    repos_to_delete = []
+    for repo in os.listdir(repos_dir):
+        repo_dir = os.path.join(repos_dir, repo)
+        if os.path.isdir(repo_dir):
+            delete_repo = True
+            for root, _, files in os.walk(os.path.join(repos_dir, repo)):
+                if not delete_repo:
+                    break
+                for file in files:
+                    file_name, ext = os.path.splitext(file)
+                    if ext in set_of_supported_extension:
+                        delete_repo = False
+                        break
+            if delete_repo:
+                repos_to_delete.append(repo_dir)
+
+    for repo_dir in repos_to_delete:
+        print(f"Delete repo {repo_dir}")
+        try:
+            shutil.rmtree(repo_dir)
+        except Exception as e:
+            print(f"Failed to delete: {e}")
+
+
 if __name__ == '__main__':
     """
     Clean repos of unsupported files.
@@ -25,5 +51,5 @@ if __name__ == '__main__':
         exit(1)
 
     repos_dir = sys.argv[1]
-    clean_repos(repos_dir)
+    delete_repos(repos_dir)
     print("Now repos are clean!")

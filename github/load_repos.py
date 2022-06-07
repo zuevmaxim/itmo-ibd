@@ -1,11 +1,3 @@
-"""
-This script allows the user to clone repositories listed in dataset from GitHub.
-It accepts
-    * path to CSV file --  dataset downloaded from https://seart-ghs.si.usi.ch/
-    * path to the output directory, where repositories are cloned
-    * allowed extensions to filter, f.e. to save only .kt files
-    * index to start from
-"""
 import logging
 import os
 import subprocess
@@ -24,16 +16,17 @@ def load_repos(csv_path: str, repos_path: str):
 
     df_repos = pd.read_csv(csv_path)
     os.environ['GIT_TERMINAL_PROMPT'] = '0'
+
     for i, repo in df_repos.iterrows():
-        user = repo['user']
         repo_owner, repo_name = repo['repo'].split('/')[-2:]
-        repo_dir_name = f'{user}#{repo_owner}#{repo_name}'
+        repo_dir_name = f'{repo_owner}#{repo_name}'
         repo_dir = os.path.join(repos_path, repo_dir_name)
         create_dir(repo_dir)
 
         p = subprocess.Popen(
             ['git', 'clone', repo['repo'], repo_dir, '--depth', '1'])
         return_code = p.wait()
+
         if return_code != 0:
             logging.info(f'Error while cloning {repo_dir_name}, skipping..')
 

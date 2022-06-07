@@ -10,6 +10,7 @@ To run docker image run following command inside itmo-bd/lupa directory:
 ```commandline
 docker run --rm \
 --mount src=<absolute path to directory with sources>,target=/data,type=bind \
---mount src=<absolute path to output directory>,target=/output,type=bind \
+--mount src=<absolute path to output directory with python imports>,target=/output_python,type=bind \
+--mount src=<absolute path to output directory with kotlin imports>,target=/output_kotlin,type=bind \
 tigina/ibd-lupa:1.0.0
 ```
