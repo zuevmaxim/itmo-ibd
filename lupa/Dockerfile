@@ -22,4 +22,4 @@ ENV PYTHONPATH=$PYTHONPATH:/Lupa/scripts
 
 RUN pip3 install psycopg2
 CMD python3 plugin_runner/batch_processing.py /data /output_python python-imports; \
-    python3 plugin_runner/batch_processing.py /data /output_java kotlin-dependencies
+    python3 plugin_runner/batch_processing.py /data /output_kotlin kotlin-dependencies
