@@ -16,9 +16,3 @@ docker run --rm \
 --mount src=<absolute path to output directory>,target=/output,type=bind \
 tigina/ibd-lupa-group-imports:1.0.0
 ```
-
-docker run --rm \
---mount
-src=/home/Dmitry.Pogrebnoy/Desktop/batch_4_python_imports/import_statements_data.csv,target=/input_data.csv,type=bind \
---mount src=/home/Dmitry.Pogrebnoy/Desktop/kaggle_libs,target=/output,type=bind \
-tigina/ibd-lupa-group-imports:1.0.0
