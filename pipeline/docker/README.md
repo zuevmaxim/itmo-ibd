@@ -15,6 +15,8 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v <folder fo stori
 ```
 
 Be aware, that <folder fo storing data> should be the same in two places in command!
+In addition, the <data storage folder> should not contain any important information, since its contents are completely
+deleted before running any scripts in the docker container.
 
 For example:
 
