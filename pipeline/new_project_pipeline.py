@@ -179,7 +179,7 @@ def predict_tags_for_new_project(git_clone_link, absolute_path_to_data):
     with open(os.path.join(DATA_TMP_FOLDER, OUTPUT_FILE_NAME), 'w') as f:
         write = csv.writer(f)
         write.writerow(["predicted_tag"])
-        write.writerows(predicted_tags)
+        write.writerows([[tag] for tag in predicted_tags])
 
     print("Predicted tags:")
     print(predicted_tags)
