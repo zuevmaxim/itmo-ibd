@@ -1,0 +1,45 @@
+{% extends 'bootstrap/base.html' %}
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    body {
+        background: #e8f1f9;
+    }
+</style>
+{% endblock %}
+
+
+{% block title %}
+Github Tags Suggester
+{% endblock %}
+
+
+{% block content %}
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-10 col-lg-8 mx-lg-auto mx-md-auto">
+
+            <h1 class="pt-5 pb-2">Welcome to the Github Tags Suggester!</h1>
+
+            <p class="lead">
+                Github Tags Suggester based on the ML model provides potentially suitable tags for your repository.
+                Only Python and Kotlin projects are supported for now. <br>
+            </p>
+            <br>
+            <p class="lead">
+                Just enter the link to git clone on Github, wait a bit (~10 min) and enjoy the result!
+            </p>
+
+
+            {{ wtf.quick_form(form) }}
+
+            <p class="pt-5"><strong>{{ message }}</strong></p>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
