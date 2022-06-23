@@ -83,7 +83,7 @@ def predict_tags_for_new_project(git_clone_link, absolute_path_to_data):
                                                                                   'mode': 'rw'}
     }
 
-    print("Docker volumes")
+    print("Lupa docker volumes")
     print(docker_volumes)
 
     # Run Lupa in docker container
@@ -183,6 +183,7 @@ def predict_tags_for_new_project(git_clone_link, absolute_path_to_data):
 
     print("Predicted tags:")
     print(predicted_tags)
+    print(f"Tags saved to {os.path.join(absolute_path_to_data, OUTPUT_FILE_NAME)}")
 
 
 if __name__ == '__main__':
