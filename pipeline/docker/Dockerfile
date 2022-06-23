@@ -15,4 +15,4 @@ COPY ./data/pipeline/final_columns.csv /final_columns.csv
 COPY ./data/full_import_dataset/lupa_import_grouping/output/import_by_package.csv /import_by_package.csv
 COPY ./pipeline/new_project_pipeline.py /new_project_pipeline.py
 
-CMD rm -rf /data_tmp/*/ && python new_project_pipeline.py $GIT_CLONE_LINK $DATA_TMP
+CMD rm -rf /data_tmp/* && python new_project_pipeline.py $GIT_CLONE_LINK $DATA_TMP

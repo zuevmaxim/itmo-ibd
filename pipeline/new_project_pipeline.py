@@ -1,5 +1,7 @@
+import csv
 import logging
 import os
+import random
 import subprocess
 import sys
 import uuid
@@ -170,11 +172,17 @@ def predict_tags_for_new_project(git_clone_link, absolute_path_to_data):
     # bla bla bla
 
     PATH_TO_TAG_DATASET = "/final_tags.csv"
+    OUTPUT_FILE_NAME = "predicted_tag.csv"
 
     tags_dataset = spark.read.csv(PATH_TO_TAG_DATASET, header=True).toPandas()["tag_name"].to_list()
-    print(tags_dataset[0])
-    print(tags_dataset[10])
-    print(tags_dataset[20])
+    predicted_tags = [tags_dataset[i] for i in random.sample(range(0, len(tags_dataset)), 5)]
+    with open(os.path.join(DATA_TMP_FOLDER, OUTPUT_FILE_NAME), 'w') as f:
+        write = csv.writer(f)
+        write.writerow(["predicted_tag"])
+        write.writerows(predicted_tags)
+
+    print("Predicted tags:")
+    print(predicted_tags)
 
 
 if __name__ == '__main__':
