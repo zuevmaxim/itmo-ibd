@@ -26,8 +26,8 @@ Bootstrap(app)
 # with Flask-WTF, each web form is represented by a class
 # "GitCloneLinkForm" can change; "(FlaskForm)" cannot
 class GitCloneLinkForm(FlaskForm):
-    owner_name = StringField('Git repo owner', validators=[DataRequired()])
-    repo_name = StringField('Git repo name', validators=[DataRequired()])
+    owner_name = StringField('Github repo owner', validators=[DataRequired()])
+    repo_name = StringField('Github repo name', validators=[DataRequired()])
     submit = SubmitField('Suggest tags')
 
 
@@ -51,12 +51,8 @@ def index():
 
 @app.route('/repo_tags/<owner_name>/<repo_name>}')
 def repo_tags(owner_name, repo_name):
-    # run function to get actor data based on the id in the path
-
     # Run pipeline docker container
     docker_client = docker.from_env()
-    # Example of run command
-    # docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /home/Dmitry.Pogrebnoy/Desktop/data_tmp:/data_tmp -e DATA_TMP=/home/Dmitry.Pogrebnoy/Desktop/data_tmp -e GIT_CLONE_LINK=https://github.com/zuevmaxim/itmo-ibd.git pogrebnoy/ibd-tag-prediction:1.0.0
     docker_volumes = {
         f'/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'},
         f'{app.config["data_tmp_dir"]}': {'bind': f'{DATA_TMP_PATH_INSIDE_DOCKER}', 'mode': 'rw'},
