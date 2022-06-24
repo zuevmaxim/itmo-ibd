@@ -51,6 +51,12 @@ def index():
 
 @app.route('/repo_tags/<owner_name>/<repo_name>}')
 def repo_tags(owner_name, repo_name):
+    original_repo_tags = []
+    original_repo_topics_request = requests.get(f"https://api.github.com/repos/{owner_name}/{repo_name}/topics",
+                                                timeout=5)
+    if original_repo_topics_request.status_code == 200:
+        original_repo_tags.extend(original_repo_topics_request.json()["names"])
+
     # Run pipeline docker container
     docker_client = docker.from_env()
     docker_volumes = {
@@ -71,10 +77,12 @@ def repo_tags(owner_name, repo_name):
     try:
         with open(os.path.join(app.config['data_tmp_dir'], RESULT_FILE_NAME), "r") as f:
             reader = csv.reader(f)
-            repo_tags = list(reader)
+            predicted_repo_tags = list(reader)
             # flatten list
-            repo_tags = [tag for tag_signle_list in repo_tags for tag in tag_signle_list]
-            return render_template('repo_tags.html', repo_name=repo_name, tags=repo_tags)
+            predicted_repo_tags = [tag for tag_signle_list in predicted_repo_tags for tag in tag_signle_list]
+            return render_template('repo_tags.html', repo_name=repo_name,
+                                   predicted_repo_tags=predicted_repo_tags,
+                                   original_repo_tags=original_repo_tags)
     except EnvironmentError:
         return render_template('404.html', logs=container_logs), 404
 
