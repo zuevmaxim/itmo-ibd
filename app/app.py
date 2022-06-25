@@ -1,7 +1,9 @@
 import csv
 import os.path
 import sys
+import uuid
 
+import celery
 import docker
 import requests
 from flask import Flask, render_template, redirect, url_for
@@ -21,6 +23,12 @@ app.config['SECRET_KEY'] = 'C2HWGVoMGfNTBsrYQg8EcMrdTimkZfAb'
 
 # Flask-Bootstrap requires this line
 Bootstrap(app)
+
+app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
+app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
+
+celery = celery.Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
+celery.conf.update(app.config)
 
 
 # with Flask-WTF, each web form is represented by a class
@@ -57,25 +65,12 @@ def repo_tags(owner_name, repo_name):
     if original_repo_topics_request.status_code == 200:
         original_repo_tags.extend(original_repo_topics_request.json()["names"])
 
-    # Run pipeline docker container
-    docker_client = docker.from_env()
-    docker_volumes = {
-        f'/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'},
-        f'{app.config["data_tmp_dir"]}': {'bind': f'{DATA_TMP_PATH_INSIDE_DOCKER}', 'mode': 'rw'},
-    }
-    docker_environment = [
-        f"DATA_TMP={app.config['data_tmp_dir']}",
-        f"GIT_CLONE_LINK=https://github.com/{owner_name}/{repo_name}.git"
-    ]
-    container_logs = docker_client.containers.run(PIPELINE_DOCKER_IMAGE_NAME,
-                                                  auto_remove=True,
-                                                  stderr=True,
-                                                  stdout=True,
-                                                  volumes=docker_volumes,
-                                                  environment=docker_environment)
+    data_tmp_dir = os.path.join(app.config["data_tmp_dir"], uuid.uuid4().hex)
+    task = suggest_topics.delay(data_tmp_dir, owner_name, repo_name)
+    task.wait()
 
     try:
-        with open(os.path.join(app.config['data_tmp_dir'], RESULT_FILE_NAME), "r") as f:
+        with open(os.path.join(data_tmp_dir, RESULT_FILE_NAME), "r") as f:
             reader = csv.reader(f)
             predicted_repo_tags = list(reader)
             # flatten list
@@ -83,8 +78,28 @@ def repo_tags(owner_name, repo_name):
             return render_template('repo_tags.html', repo_name=repo_name,
                                    predicted_repo_tags=predicted_repo_tags,
                                    original_repo_tags=original_repo_tags)
-    except EnvironmentError:
-        return render_template('404.html', logs=container_logs), 404
+    except EnvironmentError as e:
+        return render_template('404.html'), 404
+
+
+@celery.task()
+def suggest_topics(data_tmp_dir, owner_name, repo_name):
+    # Run pipeline docker container
+    docker_client = docker.from_env()
+    docker_volumes = {
+        f'/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'},
+        f'{data_tmp_dir}': {'bind': f'{DATA_TMP_PATH_INSIDE_DOCKER}', 'mode': 'rw'},
+    }
+    docker_environment = [
+        f"DATA_TMP={data_tmp_dir}",
+        f"GIT_CLONE_LINK=https://github.com/{owner_name}/{repo_name}.git"
+    ]
+    docker_client.containers.run(PIPELINE_DOCKER_IMAGE_NAME,
+                                 auto_remove=True,
+                                 stderr=True,
+                                 stdout=True,
+                                 volumes=docker_volumes,
+                                 environment=docker_environment)
 
 
 @app.errorhandler(500)
