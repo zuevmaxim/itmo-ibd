@@ -4,49 +4,34 @@ import sys
 import pandas as pd
 
 
+def get_imports_to_packages(df_full: pd.DataFrame, import_to_package_path: str, min_count: int = 10) -> pd.DataFrame:
+    import_to_package = pd.read_csv(os.path.join(import_to_package_path, 'import_to_package.csv'))
+    import_to_package = import_to_package.groupby(['import', 'package']).first().reset_index()
+
+    package_count = pd.read_csv(os.path.join(import_to_package_path, 'total_by_package.csv'))
+    package_count = package_count[package_count['count'] >= min_count]
+    import_to_package = import_to_package[import_to_package['package'].isin(package_count['package'])]
+
+    import_dataset_with_package = df_full.merge(import_to_package, how='inner', on='import')
+
+    return import_dataset_with_package
+
+
 def perform_adding(full_import_dataset_path: str,
                    kotlin_import_to_package_path: str,
                    python_import_to_package_path: str,
                    output_dir_path: str):
     full_import_dataset = pd.read_csv(full_import_dataset_path)
 
-    kotlin_import_to_package = pd.read_csv(os.path.join(kotlin_import_to_package_path, 'import_to_package.csv'))
-    kotlin_package_count = pd.read_csv(os.path.join(kotlin_import_to_package_path, 'total_by_package.csv'))
-    kotlin_package_count = kotlin_package_count[kotlin_package_count['count'] > 10]
-    kotlin_import_to_package = kotlin_import_to_package[
-        kotlin_import_to_package['package'].isin(kotlin_package_count['package'])]
+    kotlin_import_with_package = get_imports_to_packages(
+        full_import_dataset[full_import_dataset['is_kotlin_import'] == 1], kotlin_import_to_package_path)
 
-    python_import_to_package = pd.read_csv(os.path.join(python_import_to_package_path, 'import_to_package.csv'))
-    python_package_count = pd.read_csv(os.path.join(python_import_to_package_path, 'total_by_package.csv'))
-    python_package_count = python_package_count[python_package_count['count'] > 10]
-    python_import_to_package = python_import_to_package[
-        python_import_to_package['package'].isin(python_package_count['package'])]
+    python_import_with_package = get_imports_to_packages(
+        full_import_dataset[full_import_dataset['is_python_import'] == 1], python_import_to_package_path)
 
-    import_to_package = pd.concat([kotlin_import_to_package, python_import_to_package])
-    import_to_id = {imp: id for id, imp in enumerate(import_to_package['import'].unique())}
-    package_to_id = {pac: id for id, pac in enumerate(import_to_package['package'].unique())}
-    import_to_package_dict = {d['import']: d['package'] for i, d in import_to_package.iterrows()}
+    import_to_package = pd.concat([kotlin_import_with_package, python_import_with_package])
 
-    pd.DataFrame.from_dict({
-        'import': import_to_id.keys(),
-        'id': import_to_id.values(),
-    }).to_csv(os.path.join(output_dir_path, f'import_to_id.csv'), index=False)
-
-    pd.DataFrame.from_dict({
-        'package': package_to_id.keys(),
-        'id': package_to_id.values(),
-    }).to_csv(os.path.join(output_dir_path, f'package_to_id.csv'), index=False)
-
-    full_import_dataset['import'] = full_import_dataset['import'] \
-        .apply(lambda imp: import_to_id.get(imp))
-    full_import_dataset = full_import_dataset.dropna()
-
-    full_import_dataset['package'] = \
-        full_import_dataset['import'].apply(
-        lambda imp: None if import_to_package_dict.get(imp) else package_to_id.get(import_to_package_dict.get(imp)))
-    full_import_dataset = full_import_dataset.dropna()
-
-    full_import_dataset.to_csv(os.path.join(output_dir_path, f'full_import_dataset_with_package.csv'), index=False)
+    import_to_package.to_csv(os.path.join(output_dir_path, f'full_import_dataset_with_package.csv'), index=False)
 
 
 if __name__ == '__main__':

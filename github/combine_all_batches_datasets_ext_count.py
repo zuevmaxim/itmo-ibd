@@ -10,7 +10,7 @@ def perform_combine(batch_import_dir, full_output_dir):
         tmp_dataframe = pd.read_csv(f"{batch_import_dir}/extension_count_data_batch_{i}.csv", index_col=0)
         datasets.append(tmp_dataframe)
     dataset = pd.concat(datasets)
-    dataset.to_csv(f"{full_output_dir}/full_ext_count_dataset.csv")
+    dataset.to_csv(f"{full_output_dir}/full_ext_count_dataset.csv", index=False)
 
 
 if __name__ == '__main__':
