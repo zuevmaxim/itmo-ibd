@@ -23,8 +23,8 @@ def predict_tags(spark, data):
     PATH_TO_TAG_MODELS = "/models"
     PATH_TO_TAG_INFO = "/results.csv"
 
-    results_dataset = spark.read.csv(PATH_TO_TAG_INFO, header=True)
-    tag_to_threshold = dict(zip(results_dataset["tag"], results_dataset["trashhold2"]))
+    results_dataset = spark.read.csv(PATH_TO_TAG_INFO, header=True).toPandas()
+    tag_to_threshold = dict(zip(results_dataset["name"].values, results_dataset["threshhold2"].values))
     tags = []
     for f in os.listdir(PATH_TO_TAG_MODELS):
         print(f"processing tag {f}")
@@ -32,11 +32,11 @@ def predict_tags(spark, data):
         tag = tag_name[4:]
         clf = XGBClassifier()
         clf.load_model(os.path.join(PATH_TO_TAG_MODELS, f))
-        threshold = tag_to_threshold[tag_name]
-        y_pred_proba = clf.predict_proba([data])
-        print(f"pred={y_pred_proba[0]} threshold={threshold}")
+        threshold = float(tag_to_threshold[tag_name])
+        y_pred_proba = float(clf.predict_proba([data])[0][1])
+        print(f"pred={y_pred_proba} threshold={threshold}")
 
-        if y_pred_proba[0] > threshold:
+        if y_pred_proba > threshold:
             tags.append(tag)
 
     return tags
@@ -67,21 +67,18 @@ def predict_tags_for_new_project(git_clone_link, absolute_path_to_data):
 
     # Build file extensions count dataset
     cont_extensions = defaultdict(int)
-    for root, _, files in os.walk(PROJECT_PATH):
+    for root, _, files in os.walk(os.path.abspath(PROJECT_PATH)):
         for filename in files:
             extension = os.path.splitext(filename)[1]
             cont_extensions[extension] += 1
     extensions_metrics = []
     for extension, count in cont_extensions.items():
-        extensions_metrics.append((f"{PROJECT_NAME}", extension, count))
+        extensions_metrics.append((PROJECT_NAME, extension, count))
 
     extensions_metrics_dataset = spark.createDataFrame(extensions_metrics).toDF(
         *["project_name", "extension", "count"]).cache()
 
-    def rename_extension(package_name):
-        return f"extension#{package_name}"
-
-    udf_rename_extension = F.udf(rename_extension, returnType=StringType())
+    udf_rename_extension = F.udf(lambda extension: f"ext#{extension[1:]}", returnType=StringType())
     # Extension count dataset is ready
     extensions_metrics_dataset = extensions_metrics_dataset.select("project_name",
                                                                    udf_rename_extension("extension").alias("extension"),
@@ -140,14 +137,10 @@ def predict_tags_for_new_project(git_clone_link, absolute_path_to_data):
     python_import_to_package_dataset = spark.read.csv(PATH_TO_PYTHON_IMPORT_TO_PACKAGE_DATASET, header=True)
 
     kotlin_imports_dataset = kotlin_imports_dataset \
-        .join(kotlin_import_to_package_dataset,
-              kotlin_imports_dataset("import") == kotlin_import_to_package_dataset("import"),
-              "inner")
+        .join(kotlin_import_to_package_dataset, "import", "inner")
 
     python_imports_dataset = python_imports_dataset \
-        .join(kotlin_import_to_package_dataset,
-              python_imports_dataset("import") == python_import_to_package_dataset("import"),
-              "inner")
+        .join(python_import_to_package_dataset, "import", "inner")
 
     udf_rename_kotlin_package = F.udf(lambda package: f'package#kotlin#{package}', returnType=StringType())
     kotlin_imports_dataset = kotlin_imports_dataset \
@@ -167,16 +160,11 @@ def predict_tags_for_new_project(git_clone_link, absolute_path_to_data):
                               .groupby(['project_name', 'package'])
                               .agg(F.count("*").alias("count_different_import")))
 
-    udf_rename_extension = F.udf(lambda extension: f"ext#{extension}", returnType=StringType())
-
-    extensions_metrics_dataset = extensions_metrics_dataset.select(
-        "project_name", udf_rename_extension("extension").alias("extension")
-    ).cache()
-
     # Pivot all built dataset
-    pivot_package_dataframe = intermediate_dataframe.groupby("project_name").pivot("package").agg(F.count("*"))
-    pivot_ext_count_dataset = extensions_metrics_dataset.groupby("project_name").pivot("extension").agg(
-        F.first("count"))
+    pivot_package_dataframe = intermediate_dataframe \
+        .groupby("project_name").pivot("package").agg(F.count("*"))
+    pivot_ext_count_dataset = extensions_metrics_dataset. \
+        groupby("project_name").pivot("extension").agg(F.first("count"))
 
     # Join pivot datasets
     final_dataset = pivot_package_dataframe.join(pivot_ext_count_dataset, ["project_name"])
@@ -185,6 +173,8 @@ def predict_tags_for_new_project(git_clone_link, absolute_path_to_data):
     PATH_TO_COLUMN_DATASET = "/final_columns.csv"
 
     columns_dataset = spark.read.csv(PATH_TO_COLUMN_DATASET, header=True).toPandas()["column_name"].to_list()
+    columns_dataset = [c for c in columns_dataset if c.startswith("package#") or c.startswith("ext#")]
+
     final_data_for_prediction = []
     for item in columns_dataset:
         if item in final_dataset_dict:
