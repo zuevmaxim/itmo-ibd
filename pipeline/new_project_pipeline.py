@@ -1,7 +1,6 @@
 import csv
 import logging
 import os
-import random
 import subprocess
 import sys
 import uuid
@@ -10,6 +9,7 @@ from collections import defaultdict
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import StringType
+from xgboost import XGBClassifier
 
 import docker
 
@@ -19,16 +19,39 @@ def create_dir(dir_path: str):
         os.makedirs(dir_path)
 
 
+def predict_tags(spark, data):
+    PATH_TO_TAG_MODELS = "/models"
+    PATH_TO_TAG_INFO = "/results.csv"
+
+    results_dataset = spark.read.csv(PATH_TO_TAG_INFO, header=True)
+    tag_to_threshold = dict(zip(results_dataset["tag"], results_dataset["trashhold2"]))
+    tags = []
+    for f in os.listdir(PATH_TO_TAG_MODELS):
+        print(f"processing tag {f}")
+        tag_name, _ = f.split('.')
+        tag = tag_name[4:]
+        clf = XGBClassifier()
+        clf.load_model(os.path.join(PATH_TO_TAG_MODELS, f))
+        threshold = tag_to_threshold[tag_name]
+        y_pred_proba = clf.predict_proba([data])
+        print(f"pred={y_pred_proba[0]} threshold={threshold}")
+
+        if y_pred_proba[0] > threshold:
+            tags.append(tag)
+
+    return tags
+
+
 def predict_tags_for_new_project(git_clone_link, absolute_path_to_data):
     spark = (SparkSession
              .builder
              .appName("Process new project pipline")
              .getOrCreate())
+
     DATA_TMP_FOLDER = "/data_tmp"
     FOLDER_TO_CLONE_REPO = f"{uuid.uuid4().hex}"
     PATH_TO_CLONE_REPO = os.path.join(DATA_TMP_FOLDER, FOLDER_TO_CLONE_REPO)
     GIT_CLONE_LINK = git_clone_link
-    PROJECT_OWNER = GIT_CLONE_LINK.split("/")[-2]
     PROJECT_NAME = GIT_CLONE_LINK.split("/")[-1].split(".git")[0]
     PROJECT_PATH = os.path.join(PATH_TO_CLONE_REPO, PROJECT_NAME)
 
@@ -109,42 +132,45 @@ def predict_tags_for_new_project(git_clone_link, absolute_path_to_data):
     print("Head of kotlin import dataset")
     kotlin_imports_dataset.show()
 
-    # Imports dataset is ready
-    imports_dataset = python_imports_dataset.union(kotlin_imports_dataset).cache()
-    print("Head of full import dataset")
-    imports_dataset.show()
-
     # Apply mapping import to package
-    PATH_TO_IMPORT_TO_PACKAGE_DATASET = "/import_by_package.csv"
+    PATH_TO_KOTLIN_IMPORT_TO_PACKAGE_DATASET = "/kotlin_import_to_package.csv"
+    PATH_TO_PYTHON_IMPORT_TO_PACKAGE_DATASET = "/python_import_to_package.csv"
 
-    import_to_package_dataset = spark.read.csv(PATH_TO_IMPORT_TO_PACKAGE_DATASET, header=True).toPandas()
-    import_to_package_dict = dict(zip(import_to_package_dataset["import"], import_to_package_dataset["package"]))
+    kotlin_import_to_package_dataset = spark.read.csv(PATH_TO_KOTLIN_IMPORT_TO_PACKAGE_DATASET, header=True)
+    python_import_to_package_dataset = spark.read.csv(PATH_TO_PYTHON_IMPORT_TO_PACKAGE_DATASET, header=True)
 
-    def get_package_by_import(lib_import):
-        if lib_import in import_to_package_dict:
-            return import_to_package_dict[lib_import]
-        else:
-            return lib_import
+    kotlin_imports_dataset = kotlin_imports_dataset \
+        .join(kotlin_import_to_package_dataset,
+              kotlin_imports_dataset("import") == kotlin_import_to_package_dataset("import"),
+              "inner")
 
-    map_import_to_package = F.udf(get_package_by_import, returnType=StringType())
+    python_imports_dataset = python_imports_dataset \
+        .join(kotlin_import_to_package_dataset,
+              python_imports_dataset("import") == python_import_to_package_dataset("import"),
+              "inner")
 
-    full_import_dataset = imports_dataset.select(
-        "*", map_import_to_package("import").alias("package")
-    ).cache()
+    udf_rename_kotlin_package = F.udf(lambda package: f'package#kotlin#{package}', returnType=StringType())
+    kotlin_imports_dataset = kotlin_imports_dataset \
+        .select("project_name", udf_rename_kotlin_package("package").alias("package"))
+
+    udf_rename_python_package = F.udf(lambda package: f'package#python#{package}', returnType=StringType())
+    python_imports_dataset = python_imports_dataset \
+        .select("project_name", udf_rename_python_package("package").alias("package"))
+
+    # Imports dataset is ready
+    full_imports_dataset = python_imports_dataset.union(kotlin_imports_dataset).cache()
+    print("Head of full import dataset")
+    full_imports_dataset.show()
 
     # Make final dataset
-    intermediate_dataframe = (full_import_dataset.select("*")
+    intermediate_dataframe = (full_imports_dataset.select("*")
                               .groupby(['project_name', 'package'])
                               .agg(F.count("*").alias("count_different_import")))
 
-    def rename_package(package_name):
-        return f"package#{package_name}"
+    udf_rename_extension = F.udf(lambda extension: f"ext#{extension}", returnType=StringType())
 
-    udf_rename_package = F.udf(rename_package, returnType=StringType())
-
-    # Datasets with import and package is ready
-    intermediate_dataframe = intermediate_dataframe.select(
-        "project_name", udf_rename_package("package").alias("package")
+    extensions_metrics_dataset = extensions_metrics_dataset.select(
+        "project_name", udf_rename_extension("extension").alias("extension")
     ).cache()
 
     # Pivot all built dataset
@@ -169,13 +195,11 @@ def predict_tags_for_new_project(git_clone_link, absolute_path_to_data):
     # !!! Push final_data_for_prediction to predictor
     print(final_data_for_prediction)
 
-    # bla bla bla
+    predicted_tags = predict_tags(spark, final_data_for_prediction)
 
-    PATH_TO_TAG_DATASET = "/final_tags.csv"
     OUTPUT_FILE_NAME = "predicted_tag.csv"
 
-    tags_dataset = spark.read.csv(PATH_TO_TAG_DATASET, header=True).toPandas()["tag_name"].to_list()
-    predicted_tags = [tags_dataset[i] for i in random.sample(range(0, len(tags_dataset)), 5)]
+    # predicted_tags = [tags_dataset[i] for i in random.sample(range(0, len(tags_dataset)), 5)]
     with open(os.path.join(DATA_TMP_FOLDER, OUTPUT_FILE_NAME), 'w') as f:
         write = csv.writer(f)
         write.writerows([[tag] for tag in predicted_tags])

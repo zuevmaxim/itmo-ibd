@@ -3981,7 +3981,6 @@ package#python#zope
 package#python#zulint
 package#python#zulip_bots
 package#python#zwave_js_server
-packages_count
 ext#
 ext#0
 ext#0+
@@ -6743,7 +6742,7 @@ ext#pxi
 ext#pxm
 ext#pxr
 ext#py
-ext#py
+ext#py 
 ext#py!
 "ext#py,old2"
 ext#py-dist
@@ -7834,7 +7833,6 @@ ext#zraw
 ext#zsh
 ext#zst
 ext#zzz
-ext_count
 tag#3d
 tag#ai
 tag#algorithm
